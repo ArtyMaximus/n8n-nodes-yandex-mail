@@ -267,7 +267,7 @@ export class YandexMail implements INodeType {
 				default: '',
 				required: true,
 				description:
-					'Target folder. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
+					'Target folder. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 				displayOptions: {
 					show: {
 						resource: ['message'],
