@@ -1,0 +1,18 @@
+{
+	"node": "n8n-nodes-base.yandexMailTrigger",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Communication"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://yandex.ru/support/yandex-360/customers/mail/ru/mail-clients/others"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://yandex.ru/support/yandex-360/business/mail/ru/web/security/oauth"
+			}
+		]
+	}
+}

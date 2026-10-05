@@ -1,0 +1,71 @@
+{
+  "name": "@artymaximus/n8n-nodes-yandex-mail",
+  "version": "1.0.0",
+  "description": "Yandex Mail poll trigger and actions for n8n. Short IMAP sessions, UID cursors, no IDLE.",
+  "keywords": [
+    "n8n-community-node-package",
+    "yandex",
+    "yandex-mail",
+    "imap",
+    "trigger",
+    "email"
+  ],
+  "license": "MIT",
+  "homepage": "https://www.npmjs.com/package/@artymaximus/n8n-nodes-yandex-mail",
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": {
+    "name": "ArtyMaximus",
+    "email": "aza-artyom@yandex.ru"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArtyMaximus/n8n-nodes-yandex-mail.git"
+  },
+  "engines": {
+    "node": ">=18.10",
+    "pnpm": ">=9.1"
+  },
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc && gulp build:icons",
+    "dev": "tsc --watch",
+    "format": "prettier nodes credentials --write",
+    "lint": "eslint nodes credentials package.json",
+    "lintfix": "eslint nodes credentials package.json --fix",
+    "prepublishOnly": "npm run build && npx eslint nodes credentials package.json -c .eslintrc.prepublish.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/YandexMailApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/YandexMail/YandexMail.node.js",
+      "dist/nodes/YandexMailTrigger/YandexMailTrigger.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@types/mailparser": "^3.4.6",
+    "@types/nodemailer": "^6.4.24",
+    "@typescript-eslint/parser": "~8.32.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-n8n-nodes-base": "^1.16.3",
+    "gulp": "^5.0.0",
+    "n8n-workflow": "*",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.2"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  },
+  "dependencies": {
+    "imapflow": "^1.2.13",
+    "mailparser": "^3.9.4",
+    "nodemailer": "^6.10.1"
+  }
+}

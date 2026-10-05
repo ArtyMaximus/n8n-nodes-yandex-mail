@@ -1,0 +1,10 @@
+export const CLIENT_NAME = 'n8n-nodes-yandex-mail';
+export const CLIENT_VERSION = '1.0.0';
+export const IMAP_PORT = 993;
+export const SMTP_PORT = 465;
+export const DEFAULT_MAX_PER_POLL = 10;
+export const MIN_POLL_HINT_SECONDS = 60;
+export const TRANSIENT_RETRIES = 3;
+export const DEFAULT_ALERT_AFTER = 5;
+export const MAX_BACKOFF_MS = 15 * 60 * 1000;
+export const SLOW_GREETING_MS = 3000;
