@@ -3,12 +3,19 @@ import type { YandexMailCredentials } from '../../credentials/YandexMailApi.cred
 import { SMTP_PORT } from './constants';
 import { formatYandexError, YandexMailError } from './errors';
 
+export type YandexSendAttachment = {
+	filename: string;
+	content: Buffer;
+	contentType?: string;
+};
+
 export type YandexSendInput = {
 	to: string;
 	subject: string;
 	text: string;
 	html?: string;
 	cc?: string;
+	attachments?: YandexSendAttachment[];
 };
 
 export type YandexSendResult = {
@@ -17,6 +24,8 @@ export type YandexSendResult = {
 	messageId: string;
 	response: string;
 	host: string;
+	attachedCount: number;
+	attachedFilenames: string[];
 };
 
 function smtpHost(server: YandexMailCredentials['server']): string {
@@ -49,6 +58,7 @@ export async function sendMessage(
 		socketTimeout: 30000,
 	});
 	try {
+		const attached = input.attachments ?? [];
 		const info = await transport.sendMail({
 			from: creds.user,
 			to,
@@ -56,6 +66,13 @@ export async function sendMessage(
 			subject: input.subject,
 			text: input.text,
 			html: input.html?.trim() || undefined,
+			attachments: attached.length
+				? attached.map((file) => ({
+						filename: file.filename,
+						content: file.content,
+						contentType: file.contentType,
+					}))
+				: undefined,
 		});
 		return {
 			accepted: (info.accepted ?? []).map(String),
@@ -63,6 +80,8 @@ export async function sendMessage(
 			messageId: normalizeMessageId(String(info.messageId ?? '')),
 			response: String(info.response ?? ''),
 			host,
+			attachedCount: attached.length,
+			attachedFilenames: attached.map((file) => file.filename),
 		};
 	} catch (err) {
 		throw new YandexMailError(formatYandexError(err));

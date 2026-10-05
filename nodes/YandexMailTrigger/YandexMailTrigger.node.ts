@@ -10,6 +10,7 @@ import type {
 import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 import { DEFAULT_ALERT_AFTER, DEFAULT_MAX_PER_POLL, MAX_BACKOFF_MS, SLOW_GREETING_MS } from '../shared/constants';
 import { formatYandexError, isAuthError, isTransientImapError } from '../shared/errors';
+import { DEFAULT_ATTACHMENT_PREFIX, envelopeToItem } from '../shared/binary';
 import { messagePassesFilters } from '../shared/parse';
 import {
 	fetchMessagesByUid,
@@ -87,6 +88,14 @@ export class YandexMailTrigger implements INodeType {
 					'Maximum number of emails to fetch each time the node polls for new messages. If more emails arrive between polls, the remaining ones will be picked up in subsequent polls.',
 			},
 			{
+				displayName: 'Download Attachments',
+				name: 'downloadAttachments',
+				type: 'boolean',
+				default: true,
+				description:
+					'Whether to put file bytes on $binary.attachment_0, attachment_1, … so Extract From File and IF $binary.attachment_0 work like Email Read IMAP',
+			},
+			{
 				displayName: 'Options',
 				name: 'options',
 				type: 'collection',
@@ -122,6 +131,14 @@ export class YandexMailTrigger implements INodeType {
 							'Optional URL that receives one POST after the failure threshold. Used as a silence watchdog.',
 					},
 					{
+						displayName: 'Attachments Prefix',
+						name: 'attachmentsPrefix',
+						type: 'string',
+						default: DEFAULT_ATTACHMENT_PREFIX,
+						description:
+							'Prefix for $binary keys. With the default, the first file is attachment_0.',
+					},
+					{
 						displayName: 'Exclude Senders',
 						name: 'excludeSenders',
 						type: 'string',
@@ -136,6 +153,14 @@ export class YandexMailTrigger implements INodeType {
 						default: '',
 						placeholder: '^noreply',
 						description: 'Drop messages whose subject matches this regular expression',
+					},
+					{
+						displayName: 'Include Inline Attachments',
+						name: 'includeInlineAttachments',
+						type: 'boolean',
+						default: false,
+						description:
+							'Whether to also put CID/inline images on $binary. Left off so a CSV stays attachment_0.',
 					},
 					{
 						displayName: 'Mark as Read',
@@ -213,6 +238,9 @@ export class YandexMailTrigger implements INodeType {
 		const includeJunk = this.getNodeParameter('includeJunk') as boolean;
 		const maxPerPoll = this.getNodeParameter('maxPerPoll') as number;
 		const selected = this.getNodeParameter('mailboxes') as string[];
+		const downloadAttachments = this.getNodeParameter('downloadAttachments', true) as boolean;
+		const attachmentsPrefix = String(options.attachmentsPrefix || DEFAULT_ATTACHMENT_PREFIX);
+		const includeInlineAttachments = Boolean(options.includeInlineAttachments);
 		const markSeen = Boolean(options.markSeen);
 		const advanceCursorOnManual = Boolean(options.advanceCursorOnManual);
 		const resetWatermark = Boolean(options.resetWatermark);
@@ -270,7 +298,8 @@ export class YandexMailTrigger implements INodeType {
 					const found = await searchNewUids(client, mailbox, decision.fromUid, budget);
 					const messages = await fetchMessagesByUid(client, mailbox, found.uids, markSeen);
 					let maxUid = persistCursor ? decision.nextIfEmpty.lastUid : previous?.lastUid ?? 0;
-					for (const message of messages) {
+					for (const envelope of messages) {
+						const message = envelope.message;
 						if (message.uid < decision.fromUid) {
 							continue;
 						}
@@ -280,7 +309,13 @@ export class YandexMailTrigger implements INodeType {
 							}
 							continue;
 						}
-						collected.push({ json: message as unknown as IDataObject });
+						collected.push(
+							await envelopeToItem(this.helpers, envelope, {
+								downloadAttachments,
+								includeInline: includeInlineAttachments,
+								prefix: attachmentsPrefix,
+							}),
+						);
 						if (persistCursor && message.uid > maxUid) {
 							maxUid = message.uid;
 						}

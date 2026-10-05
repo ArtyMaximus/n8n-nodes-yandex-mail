@@ -3,7 +3,7 @@ import type { ICredentialsDecrypted, ICredentialTestFunctions, INodeCredentialTe
 import type { YandexMailCredentials } from '../../credentials/YandexMailApi.credentials';
 import { CLIENT_NAME, CLIENT_VERSION, IMAP_PORT, TRANSIENT_RETRIES } from './constants';
 import { formatYandexError, isAuthError, isTransientImapError, YandexMailError } from './errors';
-import { parseRawMessage, type ParsedYandexMessage } from './parse';
+import { parseRawMessage, type ParsedYandexEnvelope } from './parse';
 
 export type YandexFolder = {
 	path: string;
@@ -277,7 +277,7 @@ export async function fetchMessagesByUid(
 	mailbox: string,
 	uids: number[],
 	markSeen: boolean,
-): Promise<ParsedYandexMessage[]> {
+): Promise<ParsedYandexEnvelope[]> {
 	if (!uids.length) {
 		return [];
 	}
@@ -316,7 +316,7 @@ export async function fetchMessagesByUid(
 	} finally {
 		lock.release();
 	}
-	const out: ParsedYandexMessage[] = [];
+	const out: ParsedYandexEnvelope[] = [];
 	for (const item of raw) {
 		out.push(
 			await parseRawMessage(item.source, {
@@ -327,7 +327,7 @@ export async function fetchMessagesByUid(
 			}),
 		);
 	}
-	return out.sort((a, b) => a.uid - b.uid);
+	return out.sort((a, b) => a.message.uid - b.message.uid);
 }
 
 export async function getMailboxMeta(

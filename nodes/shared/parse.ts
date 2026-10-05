@@ -1,5 +1,18 @@
-import { simpleParser, type AddressObject, type ParsedMail } from 'mailparser';
+import { simpleParser, type AddressObject, type Attachment, type ParsedMail } from 'mailparser';
 import type { IDataObject } from 'n8n-workflow';
+
+export type YandexAttachmentMeta = {
+	filename: string;
+	contentType: string;
+	size: number;
+	contentDisposition: string;
+	cid: string;
+	inline: boolean;
+};
+
+export type YandexAttachmentFile = YandexAttachmentMeta & {
+	content: Buffer;
+};
 
 export type ParsedYandexMessage = {
 	uid: number;
@@ -21,7 +34,13 @@ export type ParsedYandexMessage = {
 	flags: string[];
 	size: number;
 	hasAttachments: boolean;
+	attachments: YandexAttachmentMeta[];
 	attachmentsNote: string;
+};
+
+export type ParsedYandexEnvelope = {
+	message: ParsedYandexMessage;
+	files: YandexAttachmentFile[];
 };
 
 function addressList(value?: AddressObject | AddressObject[]): string {
@@ -114,41 +133,87 @@ function headerObject(parsed: ParsedMail): IDataObject {
 	return headers;
 }
 
-export async function parseRawMessage(source: Buffer, meta: {
-	uid: number;
-	mailbox: string;
-	flags: string[];
-	size: number;
-}): Promise<ParsedYandexMessage> {
+function isInlineAttachment(attachment: Attachment): boolean {
+	const disposition = String(attachment.contentDisposition || '').toLowerCase();
+	if (disposition === 'attachment') {
+		return false;
+	}
+	if (disposition === 'inline') {
+		return true;
+	}
+	if (attachment.related) {
+		return true;
+	}
+	return Boolean(attachment.cid);
+}
+
+function toAttachmentFile(attachment: Attachment, index: number): YandexAttachmentFile | null {
+	if (!attachment.content || !attachment.content.length) {
+		return null;
+	}
+	const filename = (attachment.filename || `attachment-${index + 1}`).trim() || `attachment-${index + 1}`;
+	const contentType = (attachment.contentType || 'application/octet-stream').trim();
+	return {
+		filename,
+		contentType,
+		size: attachment.size || attachment.content.length,
+		contentDisposition: String(attachment.contentDisposition || ''),
+		cid: String(attachment.cid || ''),
+		inline: isInlineAttachment(attachment),
+		content: Buffer.from(attachment.content),
+	};
+}
+
+export function selectAttachmentFiles(
+	files: YandexAttachmentFile[],
+	includeInline: boolean,
+): YandexAttachmentFile[] {
+	return includeInline ? files : files.filter((file) => !file.inline);
+}
+
+export async function parseRawMessage(
+	source: Buffer,
+	meta: {
+		uid: number;
+		mailbox: string;
+		flags: string[];
+		size: number;
+	},
+): Promise<ParsedYandexEnvelope> {
 	const parsed = await simpleParser(source, { skipImageLinks: true });
 	const html = typeof parsed.html === 'string' ? parsed.html : '';
 	const text = parsed.text ?? '';
-	const attachments = parsed.attachments ?? [];
+	const files = (parsed.attachments ?? [])
+		.map((attachment, index) => toAttachmentFile(attachment, index))
+		.filter((item): item is YandexAttachmentFile => Boolean(item));
+	const attachments: YandexAttachmentMeta[] = files.map(({ content: _content, ...rest }) => rest);
+	const names = attachments.map((item) => item.filename).filter(Boolean);
 
 	return {
-		uid: meta.uid,
-		mailbox: meta.mailbox,
-		source_mailbox: meta.mailbox,
-		subject: parsed.subject ?? '',
-		from: addressList(parsed.from),
-		fromEmail: firstEmail(parsed.from),
-		to: addressList(parsed.to),
-		cc: addressList(parsed.cc),
-		date: parsed.date ? parsed.date.toISOString() : '',
-		html,
-		text,
-		textAsHtml: parsed.textAsHtml ?? '',
-		messageId: (parsed.messageId ?? '').replace(/^<|>$/g, ''),
-		inReplyTo: (parsed.inReplyTo ?? '').replace(/^<|>$/g, ''),
-		references: asStringArray(parsed.references).map((item) => item.replace(/^<|>$/g, '')),
-		headers: headerObject(parsed),
-		flags: meta.flags,
-		size: meta.size || source.length,
-		hasAttachments: attachments.length > 0,
-		attachmentsNote:
-			attachments.length > 0
-				? `есть (${attachments.length}, содержимое не скачивается)`
-				: '',
+		message: {
+			uid: meta.uid,
+			mailbox: meta.mailbox,
+			source_mailbox: meta.mailbox,
+			subject: parsed.subject ?? '',
+			from: addressList(parsed.from),
+			fromEmail: firstEmail(parsed.from),
+			to: addressList(parsed.to),
+			cc: addressList(parsed.cc),
+			date: parsed.date ? parsed.date.toISOString() : '',
+			html,
+			text,
+			textAsHtml: parsed.textAsHtml ?? '',
+			messageId: (parsed.messageId ?? '').replace(/^<|>$/g, ''),
+			inReplyTo: (parsed.inReplyTo ?? '').replace(/^<|>$/g, ''),
+			references: asStringArray(parsed.references).map((item) => item.replace(/^<|>$/g, '')),
+			headers: headerObject(parsed),
+			flags: meta.flags,
+			size: meta.size || source.length,
+			hasAttachments: attachments.some((item) => !item.inline) || attachments.length > 0,
+			attachments,
+			attachmentsNote: names.length ? `есть (${names.length}): ${names.join(', ')}` : '',
+		},
+		files,
 	};
 }
 

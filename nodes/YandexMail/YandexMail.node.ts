@@ -27,6 +27,8 @@ import {
 	yandexMailConnectionTest,
 	type YandexFlagAction,
 } from '../shared/transport';
+import { DEFAULT_ATTACHMENT_PREFIX, collectOutgoingAttachments, envelopeToItem } from '../shared/binary';
+import type { ParsedYandexEnvelope } from '../shared/parse';
 import { sendMessage } from '../shared/send';
 
 export class YandexMail implements INodeType {
@@ -407,6 +409,63 @@ export class YandexMail implements INodeType {
 					},
 				},
 			},
+			{
+				displayName: 'Binary Attachments',
+				name: 'binaryAttachments',
+				type: 'string',
+				default: '*',
+				placeholder: 'attachment_0, attachment_1',
+				description:
+					'Which $binary keys to attach. * sends every file on the item (forward from the trigger). Empty sends no files.',
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['send'],
+					},
+				},
+			},
+			{
+				displayName: 'Download Attachments',
+				name: 'downloadAttachments',
+				type: 'boolean',
+				default: true,
+				description:
+					'Whether to put file bytes on $binary.attachment_0, attachment_1, … like Email Read IMAP',
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['get', 'getAll'],
+					},
+				},
+			},
+			{
+				displayName: 'Include Inline Attachments',
+				name: 'includeInlineAttachments',
+				type: 'boolean',
+				default: false,
+				description: 'Whether to also put CID/inline images on $binary',
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['get', 'getAll'],
+						downloadAttachments: [true],
+					},
+				},
+			},
+			{
+				displayName: 'Attachments Prefix',
+				name: 'attachmentsPrefix',
+				type: 'string',
+				default: DEFAULT_ATTACHMENT_PREFIX,
+				description: 'Prefix for $binary keys. With the default, the first file is attachment_0.',
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['get', 'getAll'],
+						downloadAttachments: [true],
+					},
+				},
+			},
 		],
 	};
 
@@ -452,11 +511,18 @@ export class YandexMail implements INodeType {
 
 			if (resource === 'message' && operation === 'send') {
 				for (let i = 0; i < items.length; i++) {
+					const attachments = await collectOutgoingAttachments(
+						this.helpers,
+						i,
+						items[i].binary,
+						this.getNodeParameter('binaryAttachments', i, '') as string,
+					);
 					const sent = await sendMessage(creds, {
 						to: this.getNodeParameter('to', i) as string,
 						subject: this.getNodeParameter('subject', i) as string,
 						text: this.getNodeParameter('text', i) as string,
 						html: this.getNodeParameter('html', i, '') as string,
+						attachments,
 					});
 					returnData.push({ json: sent as unknown as IDataObject });
 				}
@@ -527,7 +593,7 @@ export class YandexMail implements INodeType {
 								{ itemIndex: i },
 							);
 						}
-						returnData.push({ json: messages[0] as unknown as IDataObject });
+						returnData.push(await toMessageItem(this, messages[0], i));
 					}
 					return;
 				}
@@ -538,8 +604,8 @@ export class YandexMail implements INodeType {
 					const limit = this.getNodeParameter('limit', 0) as number;
 					const found = await searchNewUids(client, mailbox, fromUid, limit);
 					const messages = await fetchMessagesByUid(client, mailbox, found.uids, false);
-					for (const message of messages) {
-						returnData.push({ json: message as unknown as IDataObject });
+					for (const envelope of messages) {
+						returnData.push(await toMessageItem(this, envelope, 0));
 					}
 					return;
 				}
@@ -607,6 +673,21 @@ export class YandexMail implements INodeType {
 
 		return [returnData];
 	}
+}
+
+async function toMessageItem(
+	ctx: IExecuteFunctions,
+	envelope: ParsedYandexEnvelope,
+	itemIndex: number,
+): Promise<INodeExecutionData> {
+	return await envelopeToItem(ctx.helpers, envelope, {
+		downloadAttachments: ctx.getNodeParameter('downloadAttachments', itemIndex, true) as boolean,
+		includeInline: ctx.getNodeParameter('includeInlineAttachments', itemIndex, false) as boolean,
+		prefix: String(
+			ctx.getNodeParameter('attachmentsPrefix', itemIndex, DEFAULT_ATTACHMENT_PREFIX) ||
+				DEFAULT_ATTACHMENT_PREFIX,
+		),
+	});
 }
 
 function assertLocator(ctx: IExecuteFunctions, uid: number, messageId: string, itemIndex: number) {

@@ -23,6 +23,9 @@ Polls one or more folders in a single short session and starts the workflow with
 - Filters: exclude senders, subject regex (invalid regex is ignored), max size
 - Manual Execute Step does not advance the cursor unless you opt in
 - `Mark as Read` defaults to off. If you turn it on, IMAP `STORE \Seen` runs **after** `FETCH` finishes — imapflow allows only one command in flight, so a `STORE` inside the fetch iterator kills the socket (`Connection not available`)
+- **Download Attachments** is on by default. Files land on `$binary.attachment_0`, `$binary.attachment_1`, … — the same keys as Email Read IMAP. `Extract From File` and `IF {{ $binary.attachment_0 }} exists` work without remapping
+- Inline CID images stay off `$binary` unless you enable **Include Inline Attachments**, so a real CSV/PDF stays `attachment_0`
+- JSON keeps `hasAttachments`, `attachmentCount`, and `attachments[]` with `filename`, `contentType`, `size`, `binaryProperty` (`attachment_0` matches `attachments[0]`)
 
 A poll that finds N messages returns **N items**. Downstream nodes that loop items (Mark / Move with `{{ $json.uid }}`) do not need Split Out.
 
@@ -38,12 +41,12 @@ A poll that finds N messages returns **N items**. Downstream nodes that loop ite
 
 **Message**
 
-- **Get / Get Many** — same parsed shape as the trigger. Get accepts UID and/or RFC Message-ID
+- **Get / Get Many** — same parsed shape and `$binary.attachment_*` keys as the trigger. Get accepts UID and/or RFC Message-ID
 - **Move / Copy** — `MOVE`/`COPY` + UIDPLUS. Output keeps `uid` / `mailbox` / `messageId` so a later button can act again
 - **Mark** — read / unread / flagged / unflagged
 - **Delete** — Trash by default (returns the new UID there), or permanent expunge
 - **Append** — IMAP `APPEND` into a folder, no SMTP. Useful for isolated tests. Generated Message-ID looks like `n8n-yandex-test.*@n8n.test`. From is the credential email
-- **Send** — SMTP through the matching Yandex host. From is the credential email. Optional HTML; text stays as the plain part
+- **Send** — SMTP through the matching Yandex host. From is the credential email. Optional HTML; text stays as the plain part. **Binary Attachments** defaults to `*` and forwards every `$binary` file from the incoming item (or list `attachment_0, attachment_1`)
 
 Get / Move / Copy / Mark / Delete locate by UID first. If the UID is gone, they scan by Message-ID. Yandex `SEARCH HEADER Message-ID` is often empty, so the node falls back to the last ~400 envelopes in that folder. When Message-ID is set, it also walks other folders and **skips Sent / Trash / Spam / INBOX** unless that folder is the start mailbox or the destination — otherwise a leftover copy in Sent steals the first hit.
 
@@ -70,11 +73,11 @@ Self-hosted / Harbor: pin the version next to other community packages.
 
 ## Output fields
 
-Trigger / Get / Get Many: `uid`, `mailbox` / `source_mailbox`, `subject`, `from`, `fromEmail`, `to`, `cc`, `date`, `html`, `text`, `messageId`, `inReplyTo`, `references[]`, `headers`, `flags`, `size`, `hasAttachments`.
+Trigger / Get / Get Many: `uid`, `mailbox` / `source_mailbox`, `subject`, `from`, `fromEmail`, `to`, `cc`, `date`, `html`, `text`, `messageId`, `inReplyTo`, `references[]`, `headers`, `flags`, `size`, `hasAttachments`, `attachmentCount`, `attachments[]` (`filename`, `contentType`, `size`, `binaryProperty`). Files: `$binary.attachment_0` …
 
 Move / Copy / Delete (trash): `uid`, `mailbox`, `source_mailbox`, `previousUid`, `previousMailbox`, `messageId`, `moved`, `alreadyInDestination`.
 
-Send: `accepted`, `rejected`, `messageId`, `response`, `host`.
+Send: `accepted`, `rejected`, `messageId`, `response`, `host`, `attachedCount`, `attachedFilenames`.
 
 Append: `uid`, `mailbox`, `messageId`, `appended`.
 
