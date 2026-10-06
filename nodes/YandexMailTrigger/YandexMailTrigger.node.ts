@@ -314,6 +314,7 @@ export class YandexMailTrigger implements INodeType {
 								downloadAttachments,
 								includeInline: includeInlineAttachments,
 								prefix: attachmentsPrefix,
+								accountUid: creds.accountUid,
 							}),
 						);
 						if (persistCursor && message.uid > maxUid) {

@@ -5,6 +5,7 @@ import {
 	type YandexAttachmentFile,
 	type YandexAttachmentMeta,
 } from './parse';
+import { buildYandexMessageWebUrl } from './webUrl';
 
 type BinaryHelpers = Pick<IExecuteFunctions['helpers'], 'prepareBinaryData' | 'getBinaryDataBuffer'>;
 
@@ -54,7 +55,7 @@ export async function filesToBinary(
 export async function envelopeToItem(
 	helpers: Pick<BinaryHelpers, 'prepareBinaryData'>,
 	envelope: ParsedYandexEnvelope,
-	options: { downloadAttachments: boolean; includeInline: boolean; prefix: string },
+	options: { downloadAttachments: boolean; includeInline: boolean; prefix: string; accountUid?: string },
 ): Promise<INodeExecutionData> {
 	const published = publishAttachmentList(envelope.files, options.prefix, options.includeInline);
 	const names = published.attachments.map((item) => item.filename);
@@ -64,6 +65,7 @@ export async function envelopeToItem(
 		attachmentCount: published.attachments.length,
 		attachments: published.attachments,
 		attachmentsNote: names.length ? `есть (${names.length}): ${names.join(', ')}` : '',
+		webUrl: buildYandexMessageWebUrl(options.accountUid ?? '', envelope.message.messageId),
 	} as unknown as IDataObject;
 
 	if (!options.downloadAttachments || !published.files.length) {

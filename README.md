@@ -59,6 +59,7 @@ Yandex Mail API:
 - Full email (`name@yandex.ru` or a Yandex 360 address)
 - **App password** for Mail, not the account password
 - Host preset: `imap.yandex.ru` (default) or `imap.ya.ru`. Port 993 + TLS are fixed
+- Optional **Yandex Account UID** — digits from the browser URL `?uid=…` (or paste the whole `mail.360.yandex.ru` link). Used only to build `webUrl`
 - Saving the credential runs a live IMAP diagnose (CAPABILITY + INBOX status)
 
 Enable IMAP in the mailbox: Yandex Mail → Settings → Mail clients.
@@ -73,13 +74,15 @@ Self-hosted / Harbor: pin the version next to other community packages.
 
 ## Output fields
 
-Trigger / Get / Get Many: `uid`, `mailbox` / `source_mailbox`, `subject`, `from`, `fromEmail`, `to`, `cc`, `date`, `html`, `text`, `messageId`, `inReplyTo`, `references[]`, `headers`, `flags`, `size`, `hasAttachments`, `attachmentCount`, `attachments[]` (`filename`, `contentType`, `size`, `binaryProperty`). Files: `$binary.attachment_0` …
+Trigger / Get / Get Many: `uid`, `mailbox` / `source_mailbox`, `subject`, `from`, `fromEmail`, `to`, `cc`, `date`, `html`, `text`, `messageId`, `inReplyTo`, `references[]`, `headers`, `flags`, `size`, `hasAttachments`, `attachmentCount`, `attachments[]` (`filename`, `contentType`, `size`, `binaryProperty`), `webUrl`. Files: `$binary.attachment_0` …
 
-Move / Copy / Delete (trash): `uid`, `mailbox`, `source_mailbox`, `previousUid`, `previousMailbox`, `messageId`, `moved`, `alreadyInDestination`.
+`webUrl` is a Yandex 360 search link by RFC Message-ID (`?uid=<accountUid>#search?request=msgid:…`). Empty if the credential has no Account UID or the letter has no Message-ID. This is not `#/message/<mid>` — that web store id is not on IMAP.
 
-Send: `accepted`, `rejected`, `messageId`, `response`, `host`, `attachedCount`, `attachedFilenames`.
+Move / Copy / Delete (trash): `uid`, `mailbox`, `source_mailbox`, `previousUid`, `previousMailbox`, `messageId`, `webUrl`, `moved`, `alreadyInDestination`.
 
-Append: `uid`, `mailbox`, `messageId`, `appended`.
+Send: `accepted`, `rejected`, `messageId`, `webUrl`, `response`, `host`, `attachedCount`, `attachedFilenames`.
+
+Append: `uid`, `mailbox`, `messageId`, `webUrl`, `appended`.
 
 ## License
 

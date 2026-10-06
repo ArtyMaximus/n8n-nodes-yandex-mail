@@ -1,5 +1,5 @@
 export const CLIENT_NAME = 'n8n-nodes-yandex-mail';
-export const CLIENT_VERSION = '1.0.1';
+export const CLIENT_VERSION = '1.0.2';
 export const IMAP_PORT = 993;
 export const SMTP_PORT = 465;
 export const DEFAULT_MAX_PER_POLL = 10;

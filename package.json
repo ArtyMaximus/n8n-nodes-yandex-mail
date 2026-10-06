@@ -1,6 +1,6 @@
 {
   "name": "@artymaximus/n8n-nodes-yandex-mail",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Yandex Mail poll trigger and actions for n8n. Short IMAP sessions, UID cursors, no IDLE.",
   "keywords": [
     "n8n-community-node-package",

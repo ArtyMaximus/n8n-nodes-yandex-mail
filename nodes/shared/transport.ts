@@ -37,7 +37,7 @@ export function readCredentials(raw: unknown): YandexMailCredentials {
 	if (!user || !appPassword) {
 		throw new YandexMailError('Yandex Mail credentials require Email and App Password.');
 	}
-	return { user, appPassword, server };
+	return { user, appPassword, server, accountUid: (data.accountUid ?? '').trim() };
 }
 
 export function createClient(creds: YandexMailCredentials): ImapFlow {

@@ -6,6 +6,7 @@ export type YandexMailCredentials = {
 	user: string;
 	appPassword: string;
 	server: YandexMailServer;
+	accountUid: string;
 };
 
 export class YandexMailApi implements ICredentialType {
@@ -57,6 +58,15 @@ export class YandexMailApi implements ICredentialType {
 			],
 			default: 'imap.yandex.ru',
 			description: 'Yandex IMAP host. Port 993 and TLS are fixed.',
+		},
+		{
+			displayName: 'Yandex Account UID',
+			name: 'accountUid',
+			type: 'string',
+			default: '',
+			placeholder: '1130000039684572',
+			description:
+				'Optional Yandex 360 account id from the browser URL (?uid=…). Needed to emit webUrl. You can paste the digits or the whole mail.360.yandex.ru link.',
 		},
 	];
 }

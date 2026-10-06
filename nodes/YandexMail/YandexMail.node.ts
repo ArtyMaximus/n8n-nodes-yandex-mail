@@ -30,6 +30,7 @@ import {
 import { DEFAULT_ATTACHMENT_PREFIX, collectOutgoingAttachments, envelopeToItem } from '../shared/binary';
 import type { ParsedYandexEnvelope } from '../shared/parse';
 import { sendMessage } from '../shared/send';
+import { buildYandexMessageWebUrl } from '../shared/webUrl';
 
 export class YandexMail implements INodeType {
 	description: INodeTypeDescription = {
@@ -524,7 +525,7 @@ export class YandexMail implements INodeType {
 						html: this.getNodeParameter('html', i, '') as string,
 						attachments,
 					});
-					returnData.push({ json: sent as unknown as IDataObject });
+					returnData.push({ json: withWebUrl(sent as unknown as IDataObject, creds.accountUid) });
 				}
 				return [returnData];
 			}
@@ -573,7 +574,7 @@ export class YandexMail implements INodeType {
 							text: this.getNodeParameter('text', i) as string,
 							from: creds.user,
 						});
-						returnData.push({ json: appended as unknown as IDataObject });
+						returnData.push({ json: withWebUrl(appended as unknown as IDataObject, creds.accountUid) });
 					}
 					return;
 				}
@@ -593,7 +594,7 @@ export class YandexMail implements INodeType {
 								{ itemIndex: i },
 							);
 						}
-						returnData.push(await toMessageItem(this, messages[0], i));
+						returnData.push(await toMessageItem(this, messages[0], i, creds.accountUid));
 					}
 					return;
 				}
@@ -605,7 +606,7 @@ export class YandexMail implements INodeType {
 					const found = await searchNewUids(client, mailbox, fromUid, limit);
 					const messages = await fetchMessagesByUid(client, mailbox, found.uids, false);
 					for (const envelope of messages) {
-						returnData.push(await toMessageItem(this, envelope, 0));
+						returnData.push(await toMessageItem(this, envelope, 0, creds.accountUid));
 					}
 					return;
 				}
@@ -618,7 +619,7 @@ export class YandexMail implements INodeType {
 						const messageId = String(this.getNodeParameter('messageId', i, '') || '');
 						assertLocator(this, uid, messageId, i);
 						const moved = await moveMessage(client, mailbox, destination, uid, messageId);
-						returnData.push({ json: moved as unknown as IDataObject });
+						returnData.push({ json: withWebUrl(moved as unknown as IDataObject, creds.accountUid) });
 					}
 					return;
 				}
@@ -631,7 +632,7 @@ export class YandexMail implements INodeType {
 						const messageId = String(this.getNodeParameter('messageId', i, '') || '');
 						assertLocator(this, uid, messageId, i);
 						const copied = await copyMessage(client, mailbox, destination, uid, messageId);
-						returnData.push({ json: copied as unknown as IDataObject });
+						returnData.push({ json: withWebUrl(copied as unknown as IDataObject, creds.accountUid) });
 					}
 					return;
 				}
@@ -644,7 +645,7 @@ export class YandexMail implements INodeType {
 						const markAs = this.getNodeParameter('markAs', i) as YandexFlagAction;
 						assertLocator(this, uid, messageId, i);
 						const marked = await markMessage(client, mailbox, uid, messageId, markAs);
-						returnData.push({ json: marked as unknown as IDataObject });
+						returnData.push({ json: withWebUrl(marked as unknown as IDataObject, creds.accountUid) });
 					}
 					return;
 				}
@@ -657,7 +658,7 @@ export class YandexMail implements INodeType {
 						const deleteMode = this.getNodeParameter('deleteMode', i) as 'trash' | 'permanent';
 						assertLocator(this, uid, messageId, i);
 						const deleted = await deleteMessage(client, mailbox, uid, messageId, deleteMode);
-						returnData.push({ json: deleted as unknown as IDataObject });
+						returnData.push({ json: withWebUrl(deleted as unknown as IDataObject, creds.accountUid) });
 					}
 				}
 			});
@@ -679,6 +680,7 @@ async function toMessageItem(
 	ctx: IExecuteFunctions,
 	envelope: ParsedYandexEnvelope,
 	itemIndex: number,
+	accountUid: string,
 ): Promise<INodeExecutionData> {
 	return await envelopeToItem(ctx.helpers, envelope, {
 		downloadAttachments: ctx.getNodeParameter('downloadAttachments', itemIndex, true) as boolean,
@@ -687,7 +689,15 @@ async function toMessageItem(
 			ctx.getNodeParameter('attachmentsPrefix', itemIndex, DEFAULT_ATTACHMENT_PREFIX) ||
 				DEFAULT_ATTACHMENT_PREFIX,
 		),
+		accountUid,
 	});
+}
+
+function withWebUrl(json: IDataObject, accountUid: string): IDataObject {
+	return {
+		...json,
+		webUrl: buildYandexMessageWebUrl(accountUid, String(json.messageId ?? '')),
+	};
 }
 
 function assertLocator(ctx: IExecuteFunctions, uid: number, messageId: string, itemIndex: number) {
